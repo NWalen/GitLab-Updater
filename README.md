@@ -37,6 +37,6 @@ This script automatically:
 ### Step 1: Clone this repo or download the script
 
 ```bash
-git clone https://github.com/your-username/gitlab-smart-upgrade.git
-cd gitlab-smart-upgrade
-chmod +x gitlab-smart-upgrade.sh
+git clone https://github.com/NWalen/GitLab-Updater.git
+cd GitLab-Updater
+chmod +x Update-Gitlab.sh
