@@ -5,7 +5,7 @@ set -euo pipefail
 NON_INTERACTIVE=false
 [[ "${1:-}" == "--non-interactive" ]] && NON_INTERACTIVE=true
 
-# Known good upgrade path (updated with missing minors)
+# Known upgrade path
 BASELINE_VERSIONS=(
   "16.3.6"
   "16.7.6"
@@ -33,45 +33,47 @@ log() {
   echo "[`date`] $1" | tee -a "$LOGFILE"
 }
 
-progress_bar_run() {
+spinner_run() {
   local msg="$1"
   shift
   local cmd=("$@")
 
-  local total_blocks=30
-  local delay=0.15
-  local fill_char="#"
-  local empty_char="-"
+  local spin_chars='|/-\'
+  local i=0
 
-  printf "🔄 %-30s [" "$msg"
+  printf "\n🔄 %-30s " "$msg"
 
   "${cmd[@]}" &>/dev/null &
   local pid=$!
 
-  local i=0
-  while kill -0 "$pid" 2>/dev/null; do
-    local filled=$(( (i * total_blocks / 10) % (total_blocks + 1) ))
-    local bar
-    bar="$(printf "%${filled}s" | tr ' ' "$fill_char")"
-    bar="${bar}$(printf "%$((total_blocks - filled))s" | tr ' ' "$empty_char")"
-    local percent=$(( (filled * 100) / total_blocks ))
-    printf "\r🔄 %-30s [%s] %3d%%" "$msg" "$bar" "$percent"
-    sleep $delay
-    i=$((i + 1))
+  while kill -0 $pid 2>/dev/null; do
+    printf "\b${spin_chars:i++%${#spin_chars}:1}"
+    sleep 0.1
   done
 
-  wait "$pid"
+  wait $pid
   local status=$?
 
   if [[ $status -eq 0 ]]; then
-    printf "\r✅ %-30s [%s] 100%%\n" "$msg" "$(printf "%${total_blocks}s" | tr ' ' "$fill_char")"
+    printf "\b✅\n"
   else
-    printf "\r❌ %-30s [%s] Failed\n" "$msg" "$(printf "%${total_blocks}s" | tr ' ' "$empty_char")"
+    printf "\b❌\n"
   fi
 
   return $status
 }
 
+real_download_progress() {
+  local version="$1"
+  local url="$2"
+  local outfile="$3"
+
+  echo "\n🔄 Downloading $version..."
+  wget --progress=dot "$url" -O "$outfile" 2>&1 \
+    | grep --line-buffered "%" \
+    | sed -u -e "s/\./#/g" \
+    | awk '{printf("\r   [%-70s] %s", $2, $2)} END { print "" }'
+}
 
 get_current_version() {
   local version
@@ -103,16 +105,16 @@ attempt_upgrade() {
   local file="gitlab-ee_${version}-ee.0_${ARCH}.deb"
   local url="${BASE_URL}/${file}/download.deb"
 
-  progress_bar_run "Downloading $version" wget -q "$url" -O "$file"
+  real_download_progress "$version" "$url" "$file"
 
-  if ! progress_bar_run "Installing $version" sudo dpkg -i "$file" > /dev/null 2>dpkg_error.log; then
+  if ! spinner_run "Installing $version" sudo dpkg -i "$file" > /dev/null 2>dpkg_error.log; then
     log "❌ dpkg failed for $version — checking for required intermediate version..."
 
     local required_version=""
-    required_version=$(grep -oP "upgrade to the latest \K[0-9]+\.[0-9]+(?=\.x)" dpkg_error.log || true)
+    required_version=$(grep -oP "upgrade to the latest \\K[0-9]+\\.[0-9]+(?=\\.x)" dpkg_error.log || true)
 
     if [[ -z "$required_version" ]]; then
-      required_version=$(grep -oP "It is required to upgrade to \K[0-9]+\.[0-9]+" dpkg_error.log || true)
+      required_version=$(grep -oP "It is required to upgrade to \\K[0-9]+\\.[0-9]+" dpkg_error.log || true)
     fi
 
     if [[ -n "$required_version" ]]; then
@@ -125,12 +127,10 @@ attempt_upgrade() {
         "17.1")  required_version="17.1.4" ;;
         "17.3")  required_version="17.3.4" ;;
         "17.4")  required_version="17.4.2" ;;
-        "17.5")  required_version="17.5.2" ;;
         "17.11") required_version="17.11.4" ;;
         "18.0")  required_version="18.0.1" ;;
-        "18.1")  required_version="18.1.2" ;;
         "18.2")  required_version="18.2.0" ;;
-        *) log "⚠️ Unknown intermediate version string: $required_version"; exit 1 ;;
+        *) log "⚠️ Unknown required version: $required_version"; exit 1 ;;
       esac
 
       log "➕ Inserting required version: $required_version before $version"
@@ -146,7 +146,7 @@ attempt_upgrade() {
     return 1
   fi
 
-  progress_bar_run "Reconfiguring $version" sudo gitlab-ctl reconfigure
+  spinner_run "Reconfiguring $version" sudo gitlab-ctl reconfigure
 
   log "✅ Successfully upgraded to $version"
   sudo gitlab-rake gitlab:env:info >> "$LOGFILE"
