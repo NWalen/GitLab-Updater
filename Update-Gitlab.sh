@@ -5,31 +5,16 @@ set -euo pipefail
 NON_INTERACTIVE=false
 [[ "${1:-}" == "--non-interactive" ]] && NON_INTERACTIVE=true
 
-# GitLab official required upgrade path (https://docs.gitlab.com/ee/update/#upgrade-paths)
+# Known good upgrade path (updated with missing minors)
 BASELINE_VERSIONS=(
-  # GitLab 15
-  "15.0.5"
-  "15.1.6"
-  "15.4.6"
-  "15.11.13"
-
-  # GitLab 16
-  "16.0.10"
-  "16.1.8"
-  "16.2.11"
-  "16.3.9"
-  "16.7.10"
-  "16.11.10"
-
-  # GitLab 17
-  "17.1.8"
-  "17.3.7"
+  "16.3.6"
+  "16.7.6"
+  "16.9.1"
+  "16.11.5"
+  "17.0.3"
+  "17.1.4"
+  "17.3.4"
   "17.4.2"
-  "17.5.4"
-  "17.8.4"
-  "17.11.4"
-
-  # GitLab 18
   "18.0.1"
   "18.2.0"
 )
@@ -47,57 +32,24 @@ log() {
   echo "[`date`] $1" | tee -a "$LOGFILE"
 }
 
-spinner_run() {
-  local msg="$1"
-  shift
-  local cmd=("$@")
-
-  local spin_chars='|/-\\'
-  local i=0
-
-  printf "\n🔄 %-30s " "$msg"
-
-  "${cmd[@]}" &>/dev/null &
-  local pid=$!
-
-  while kill -0 $pid 2>/dev/null; do
-    printf "\b${spin_chars:i++%${#spin_chars}:1}"
-    sleep 0.1
-  done
-
-  wait $pid
-  local status=$?
-
-  if [[ $status -eq 0 ]]; then
-    printf "\b✅\n"
-  else
-    printf "\b❌\n"
-  fi
-
-  return $status
+progress_bar() {
+  local message="$1"
+  printf "🔄 %-60s" "$message"
 }
 
-real_download_progress() {
-  local version="$1"
-  local url="$2"
-  local outfile="$3"
-
-  echo -e "\n🔄 Downloading $version..."
-  curl -# -L "$url" -o "$outfile"
+done_bar() {
+  echo -e " ✅"
 }
 
 get_current_version() {
-  local version_file="/opt/gitlab/version-manifest.json"
-  if [[ -f "$version_file" ]]; then
-    version=$(grep '"version"' "$version_file" | head -1 | cut -d '"' -f4)
-    if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-      echo "$version"
-    else
-      echo "UNKNOWN"
-    fi
-  else
-    echo "UNKNOWN"
-  fi
+  local version
+  version=$(sudo gitlab-rake gitlab:env:info 2>/dev/null \
+    | awk '/^GitLab information/,/^GitLab Shell/' \
+    | grep "^Version:" \
+    | head -1 \
+    | awk '{print $2}' \
+    | cut -d '-' -f1)
+  echo "$version"
 }
 
 find_upgrade_path() {
@@ -119,55 +71,46 @@ attempt_upgrade() {
   local file="gitlab-ee_${version}-ee.0_${ARCH}.deb"
   local url="${BASE_URL}/${file}/download.deb"
 
-  real_download_progress "$version" "$url" "$file"
+  progress_bar "Downloading $version..."
+  wget -q "$url" -O "$file"
+  done_bar
 
-  if ! spinner_run "Installing $version" sudo dpkg -i "$file" > /dev/null 2>dpkg_error.log; then
+  progress_bar "Installing $version..."
+  if ! sudo dpkg -i "$file" > /dev/null 2>dpkg_error.log; then
+    done_bar
     log "❌ dpkg failed for $version — checking for required intermediate version..."
 
-    local required_version=""
+    local required_version
     required_version=$(grep -oP "upgrade to the latest \K[0-9]+\.[0-9]+(?=\.x)" dpkg_error.log || true)
-
-    if [[ -z "$required_version" ]]; then
-      required_version=$(grep -oP "It is required to upgrade to \K[0-9]+\.[0-9]+" dpkg_error.log || true)
-    fi
 
     if [[ -n "$required_version" ]]; then
       case "$required_version" in
-        "15.0")  required_version="15.0.5" ;;
-        "15.1")  required_version="15.1.6" ;;
-        "15.4")  required_version="15.4.6" ;;
-        "15.11") required_version="15.11.13" ;;
-        "16.0")  required_version="16.0.10" ;;
-        "16.1")  required_version="16.1.8" ;;
-        "16.2")  required_version="16.2.11" ;;
-        "16.3")  required_version="16.3.9" ;;
-        "16.7")  required_version="16.7.10" ;;
-        "16.11") required_version="16.11.10" ;;
-        "17.1")  required_version="17.1.8" ;;
-        "17.3")  required_version="17.3.7" ;;
+        "16.3")  required_version="16.3.6" ;;
+        "16.7")  required_version="16.7.6" ;;
+        "16.9")  required_version="16.9.1" ;;
+        "16.11") required_version="16.11.5" ;;
+        "17.0")  required_version="17.0.3" ;;
+        "17.1")  required_version="17.1.4" ;;
+        "17.3")  required_version="17.3.4" ;;
         "17.4")  required_version="17.4.2" ;;
-        "17.5")  required_version="17.5.4" ;;
-        "17.8")  required_version="17.8.4" ;;
-        "17.11") required_version="17.11.4" ;;
         "18.0")  required_version="18.0.1" ;;
         "18.2")  required_version="18.2.0" ;;
-        *) log "⚠️ Unknown required version: $required_version"; exit 1 ;;
+        *) log "⚠️ Unknown version requirement: $required_version"; exit 1 ;;
       esac
 
       log "➕ Inserting required version: $required_version before $version"
       UPGRADE_PATH=("$required_version" "$version" "${UPGRADE_PATH[@]:1}")
     else
-      log "❌ Could not determine required intermediate version. Dumping dpkg_error.log:"
-      echo "------------ dpkg_error.log -------------"
-      cat dpkg_error.log
-      echo "-----------------------------------------"
-      log "💡 Suggest manually checking upgrade path: https://docs.gitlab.com/ee/update/#upgrade-paths"
+      log "❌ Could not determine missing version. Check dpkg_error.log."
       exit 1
     fi
     return 1
   fi
+  done_bar
 
-  spinner_run "Reconfiguring $version" sudo gitlab-ctl reconfigure
+  progress_bar "Reconfiguring $version..."
+  sudo gitlab-ctl reconfigure > /dev/null
+  done_bar
 
   log "✅ Successfully upgraded to $version"
   sudo gitlab-rake gitlab:env:info >> "$LOGFILE"
