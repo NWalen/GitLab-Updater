@@ -24,7 +24,7 @@ BASELINE_VERSIONS=(
   # GitLab 17
   "17.1.8"
   "17.3.7"
-  "17.4.2"  # Added current version for path alignment
+  "17.4.2"
   "17.5.4"
   "17.8.4"
   "17.11.4"
