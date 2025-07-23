@@ -89,8 +89,12 @@ real_download_progress() {
 get_current_version() {
   local version_file="/opt/gitlab/version-manifest.json"
   if [[ -f "$version_file" ]]; then
-    version=$(jq -r '.version' "$version_file")
-    echo "$version"
+    version=$(grep '"version"' "$version_file" | head -1 | cut -d '"' -f4)
+    if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      echo "$version"
+    else
+      echo "UNKNOWN"
+    fi
   else
     echo "UNKNOWN"
   fi
