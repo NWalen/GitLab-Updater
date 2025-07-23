@@ -42,15 +42,12 @@ done_bar() {
 }
 
 get_current_version() {
-  local version
-  version=$(sudo gitlab-rake gitlab:env:info 2>/dev/null \
+  sudo gitlab-rake gitlab:env:info 2>/dev/null \
     | awk '/^GitLab information/,/^GitLab Shell/' \
-    | grep "^Version:" \
-    | head -1 \
-    | awk '{print $2}' \
-    | cut -d '-' -f1)
-  echo "$version"
+    | grep -m1 "^Version:" \
+    | sed -E 's/Version:[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+).*/\1/'
 }
+
 
 find_upgrade_path() {
   local current="$1"
