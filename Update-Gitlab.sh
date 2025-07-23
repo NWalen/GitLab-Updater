@@ -52,7 +52,7 @@ spinner_run() {
   shift
   local cmd=("$@")
 
-  local spin_chars='|/-\'
+  local spin_chars='|/-\\'
   local i=0
 
   printf "\n🔄 %-30s " "$msg"
