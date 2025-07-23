@@ -40,3 +40,5 @@ This script automatically:
 git clone https://github.com/NWalen/GitLab-Updater.git
 cd GitLab-Updater
 chmod +x Update-Gitlab.sh
+sudo ./gitlab-smart-upgrade.sh --non-interactive
+
