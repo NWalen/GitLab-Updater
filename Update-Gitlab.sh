@@ -1,7 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
-# Baseline upgrade path
+# Optional flag
+NON_INTERACTIVE=false
+[[ "${1:-}" == "--non-interactive" ]] && NON_INTERACTIVE=true
+
+# Known good upgrade path (updated with missing minors)
 BASELINE_VERSIONS=(
   "16.3.6"
   "16.7.6"
@@ -9,6 +13,7 @@ BASELINE_VERSIONS=(
   "16.11.5"
   "17.0.3"
   "17.1.4"
+  "17.3.4"
   "17.4.2"
   "18.0.1"
   "18.2.0"
@@ -25,6 +30,15 @@ cd "$DOWNLOAD_DIR"
 
 log() {
   echo "[`date`] $1" | tee -a "$LOGFILE"
+}
+
+progress_bar() {
+  local message="$1"
+  printf "🔄 %-60s" "$message"
+}
+
+done_bar() {
+  echo -e " ✅"
 }
 
 get_current_version() {
@@ -57,19 +71,19 @@ attempt_upgrade() {
   local file="gitlab-ee_${version}-ee.0_${ARCH}.deb"
   local url="${BASE_URL}/${file}/download.deb"
 
-  log "➡️  Attempting upgrade to GitLab ${version}"
-  log "🔽 Downloading $file..."
+  progress_bar "Downloading $version..."
   wget -q "$url" -O "$file"
+  done_bar
 
-  log "📦 Installing $file..."
-  if ! sudo dpkg -i "$file" 2>dpkg_error.log; then
-    log "❌ dpkg install failed for $version. Parsing for required intermediate version..."
+  progress_bar "Installing $version..."
+  if ! sudo dpkg -i "$file" > /dev/null 2>dpkg_error.log; then
+    done_bar
+    log "❌ dpkg failed for $version — checking for required intermediate version..."
 
     local required_version
     required_version=$(grep -oP "upgrade to the latest \K[0-9]+\.[0-9]+(?=\.x)" dpkg_error.log || true)
 
     if [[ -n "$required_version" ]]; then
-      # Normalize to latest known patch (you may enhance this by querying actual versions)
       case "$required_version" in
         "16.3")  required_version="16.3.6" ;;
         "16.7")  required_version="16.7.6" ;;
@@ -81,41 +95,46 @@ attempt_upgrade() {
         "17.4")  required_version="17.4.2" ;;
         "18.0")  required_version="18.0.1" ;;
         "18.2")  required_version="18.2.0" ;;
-        *) log "⚠️ Unknown intermediate version requirement: $required_version"; exit 1 ;;
+        *) log "⚠️ Unknown version requirement: $required_version"; exit 1 ;;
       esac
 
-      log "➕ Adding required intermediate version: $required_version"
+      log "➕ Inserting required version: $required_version before $version"
       UPGRADE_PATH=("$required_version" "$version" "${UPGRADE_PATH[@]:1}")
     else
-      log "❌ Could not detect required intermediate version. Check dpkg_error.log"
+      log "❌ Could not determine missing version. Check dpkg_error.log."
       exit 1
     fi
     return 1
   fi
+  done_bar
 
-  log "⚙️ Reconfiguring GitLab..."
-  sudo gitlab-ctl reconfigure
+  progress_bar "Reconfiguring $version..."
+  sudo gitlab-ctl reconfigure > /dev/null
+  done_bar
 
-  log "✅ Upgrade to ${version} completed."
-  sudo gitlab-rake gitlab:env:info | tee -a "$LOGFILE"
-  echo ""
-  read -p "🔎 Press Enter to continue to the next upgrade..."
+  log "✅ Successfully upgraded to $version"
+  sudo gitlab-rake gitlab:env:info >> "$LOGFILE"
+
+  if [[ "$NON_INTERACTIVE" == false ]]; then
+    read -p "🔎 Press Enter to continue..."
+  fi
+
   return 0
 }
 
 main() {
   local current
   current=$(get_current_version)
-  log "📌 Current GitLab version detected: $current"
+  log "📌 Current GitLab version: $current"
 
   find_upgrade_path "$current"
 
   if [[ "${#UPGRADE_PATH[@]}" -eq 0 ]]; then
-    log "✅ You are already at the latest version!"
+    log "✅ Already at latest known version."
     exit 0
   fi
 
-  log "🚀 Starting upgrade from $current to ${UPGRADE_PATH[-1]}"
+  log "🚀 Starting upgrade path from $current → ${UPGRADE_PATH[-1]}"
 
   local i=0
   while [[ $i -lt ${#UPGRADE_PATH[@]} ]]; do
