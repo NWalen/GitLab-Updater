@@ -34,14 +34,39 @@ log() {
   echo "[`date`] $1" | tee -a "$LOGFILE"
 }
 
-progress_bar() {
-  local message="$1"
-  printf "🔄 %-60s" "$message"
-}
+progress_bar_run() {
+  local msg="$1"
+  shift
+  local cmd=("$@")
 
-done_bar() {
-  echo -e " ✅"
-}
+  local total_blocks=20
+  local delay=0.2
+  local bar=""
+  local fill_char="█"
+  local empty_char="░"
+
+  printf "🔄 %-30s [" "$msg"
+
+  # Run the command in background
+  "${cmd[@]}" &>/dev/null &
+  local pid=$!
+
+  local i=0
+  while kill -0 "$pid" 2>/dev/null; do
+    local filled=$(( (i * total_blocks / 10) % (total_blocks + 1) ))
+    bar=$(printf "%-${total_blocks}s" | tr ' ' "$empty_char")
+    bar="${bar:0:$filled//${empty_char}/${fill_char}}${bar:$filled}"
+    printf "\r🔄 %-30s [%s] %2d%%" "$msg" "$bar" $(( (filled * 100) / total_blocks ))
+    sleep $delay
+    i=$((i + 1))
+  done
+
+  wait "$pid"
+  local status=$?
+
+  # Final display
+  if [[ $]()]()
+
 
 get_current_version() {
   local version
