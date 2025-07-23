@@ -20,7 +20,6 @@ BASELINE_VERSIONS=(
   "18.2.0"
 )
 
-
 OS_CODENAME="jammy"
 ARCH="amd64"
 BASE_URL="https://packages.gitlab.com/gitlab/gitlab-ee/packages/ubuntu/${OS_CODENAME}"
@@ -47,7 +46,6 @@ progress_bar_run() {
 
   printf "🔄 %-30s [" "$msg"
 
-  # Run the command in background
   "${cmd[@]}" &>/dev/null &
   local pid=$!
 
@@ -64,9 +62,14 @@ progress_bar_run() {
   wait "$pid"
   local status=$?
 
-  # Final display
-  if [[ $]()]()
+  if [[ $status -eq 0 ]]; then
+    printf "\r✅ %-30s [%s] 100%%\n" "$msg" "$(printf "%${total_blocks}s" | tr ' ' "$fill_char")"
+  else
+    printf "\r❌ %-30s [%s] Failed\n" "$msg" "$(printf "%${total_blocks}s" | tr ' ' "$empty_char")"
+  fi
 
+  return $status
+}
 
 get_current_version() {
   local version
@@ -98,19 +101,14 @@ attempt_upgrade() {
   local file="gitlab-ee_${version}-ee.0_${ARCH}.deb"
   local url="${BASE_URL}/${file}/download.deb"
 
-  progress_bar "Downloading $version..."
-  wget -q "$url" -O "$file"
-  done_bar
+  progress_bar_run "Downloading $version" wget -q "$url" -O "$file"
 
-  progress_bar "Installing $version..."
-  if ! sudo dpkg -i "$file" > /dev/null 2>dpkg_error.log; then
-    done_bar
+  if ! progress_bar_run "Installing $version" sudo dpkg -i "$file" > /dev/null 2>dpkg_error.log; then
     log "❌ dpkg failed for $version — checking for required intermediate version..."
 
     local required_version=""
     required_version=$(grep -oP "upgrade to the latest \K[0-9]+\.[0-9]+(?=\.x)" dpkg_error.log || true)
 
-    # Fallback parsing
     if [[ -z "$required_version" ]]; then
       required_version=$(grep -oP "It is required to upgrade to \K[0-9]+\.[0-9]+" dpkg_error.log || true)
     fi
@@ -125,7 +123,8 @@ attempt_upgrade() {
         "17.1")  required_version="17.1.4" ;;
         "17.3")  required_version="17.3.4" ;;
         "17.4")  required_version="17.4.2" ;;
-        "17.5")  required_version="17.5.2" ;;  # Add if needed
+        "17.5")  required_version="17.5.2" ;;
+        "17.11") required_version="17.11.4" ;;
         "18.0")  required_version="18.0.1" ;;
         "18.1")  required_version="18.1.2" ;;
         "18.2")  required_version="18.2.0" ;;
@@ -144,11 +143,8 @@ attempt_upgrade() {
     fi
     return 1
   fi
-  done_bar
 
-  progress_bar "Reconfiguring $version..."
-  sudo gitlab-ctl reconfigure > /dev/null
-  done_bar
+  progress_bar_run "Reconfiguring $version" sudo gitlab-ctl reconfigure
 
   log "✅ Successfully upgraded to $version"
   sudo gitlab-rake gitlab:env:info >> "$LOGFILE"
@@ -159,7 +155,6 @@ attempt_upgrade() {
 
   return 0
 }
-
 
 main() {
   local current
