@@ -5,17 +5,30 @@ set -euo pipefail
 NON_INTERACTIVE=false
 [[ "${1:-}" == "--non-interactive" ]] && NON_INTERACTIVE=true
 
-# Known upgrade path
+# GitLab official required upgrade path (https://docs.gitlab.com/ee/update/#upgrade-paths)
 BASELINE_VERSIONS=(
-  "16.3.6"
-  "16.7.6"
-  "16.9.1"
-  "16.11.5"
-  "17.0.3"
-  "17.1.4"
-  "17.3.4"
-  "17.4.2"
+  # GitLab 15
+  "15.0.5"
+  "15.1.6"
+  "15.4.6"
+  "15.11.13"
+  
+  # GitLab 16
+  "16.0.10"
+  "16.1.8"
+  "16.2.11"
+  "16.3.9"
+  "16.7.10"
+  "16.11.10"
+
+  # GitLab 17
+  "17.1.8"
+  "17.3.7"
+  "17.5.4"
+  "17.8.4"
   "17.11.4"
+
+  # GitLab 18
   "18.0.1"
   "18.2.0"
 )
@@ -116,14 +129,20 @@ attempt_upgrade() {
 
     if [[ -n "$required_version" ]]; then
       case "$required_version" in
-        "16.3")  required_version="16.3.6" ;;
-        "16.7")  required_version="16.7.6" ;;
-        "16.9")  required_version="16.9.1" ;;
-        "16.11") required_version="16.11.5" ;;
-        "17.0")  required_version="17.0.3" ;;
-        "17.1")  required_version="17.1.4" ;;
-        "17.3")  required_version="17.3.4" ;;
-        "17.4")  required_version="17.4.2" ;;
+        "15.0")  required_version="15.0.5" ;;
+        "15.1")  required_version="15.1.6" ;;
+        "15.4")  required_version="15.4.6" ;;
+        "15.11") required_version="15.11.13" ;;
+        "16.0")  required_version="16.0.10" ;;
+        "16.1")  required_version="16.1.8" ;;
+        "16.2")  required_version="16.2.11" ;;
+        "16.3")  required_version="16.3.9" ;;
+        "16.7")  required_version="16.7.10" ;;
+        "16.11") required_version="16.11.10" ;;
+        "17.1")  required_version="17.1.8" ;;
+        "17.3")  required_version="17.3.7" ;;
+        "17.5")  required_version="17.5.4" ;;
+        "17.8")  required_version="17.8.4" ;;
         "17.11") required_version="17.11.4" ;;
         "18.0")  required_version="18.0.1" ;;
         "18.2")  required_version="18.2.0" ;;
