@@ -69,10 +69,7 @@ real_download_progress() {
   local outfile="$3"
 
   echo -e "\n🔄 Downloading $version..."
-  wget --progress=dot:giga "$url" -O "$outfile" 2>&1 \
-    | grep --line-buffered "%" \
-    | sed -u -e "s/\./#/g" \
-    | awk '{gsub("%", "", $2); percent=$2; barLen=int(percent/2); printf("\r   [%-50s] %3s%%", substr("##################################################", 1, barLen), percent)} END { print "" }'
+  curl -# -L "$url" -o "$outfile"
 }
 
 get_current_version() {
