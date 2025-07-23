@@ -89,9 +89,7 @@ real_download_progress() {
 get_current_version() {
   local version
   version=$(sudo gitlab-rake gitlab:env:info 2>/dev/null \
-    | awk '/^GitLab information/,/^GitLab Shell/' \
-    | grep "^Version:" \
-    | head -1 \
+    | grep -m1 '^  Version:' \
     | awk '{print $2}' \
     | cut -d '-' -f1)
   echo "$version"
@@ -106,7 +104,6 @@ find_upgrade_path() {
     if [[ "$started" -eq 1 ]]; then
       UPGRADE_PATH+=("$v")
     elif [[ "$v" == "$current" ]]; then
-      UPGRADE_PATH+=("$v")
       started=1
     fi
   done
@@ -191,7 +188,7 @@ main() {
 
   log "🚀 Starting upgrade path from $current → ${UPGRADE_PATH[-1]}"
 
-  local i=1
+  local i=0
   while [[ $i -lt ${#UPGRADE_PATH[@]} ]]; do
     if attempt_upgrade "${UPGRADE_PATH[$i]}"; then
       ((i++))
