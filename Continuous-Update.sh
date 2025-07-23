@@ -84,4 +84,48 @@ attempt_upgrade() {
         "17.3") required_minor="17.3.4" ;;
         "17.4") required_minor="17.4.2" ;;
         "18.0") required_minor="18.0.1" ;;
-        "18.2") required_minor="18.2.0_
+        "18.2") required_minor="18.2.0" ;;
+        *) log "⚠️ Unknown required version: $required_minor"; exit 1 ;;
+      esac
+
+      log "➕ Inserting $required_minor before $version and restarting..."
+      BASELINE_VERSIONS=("$required_minor" "$version" "${BASELINE_VERSIONS[@]}")
+      exec "$0" "$@"
+    else
+      log "❌ Couldn't detect version. Check dpkg_error.log"
+      exit 1
+    fi
+  fi
+  done_bar
+
+  progress_bar "Reconfiguring $version..."
+  sudo gitlab-ctl reconfigure > /dev/null
+  done_bar
+
+  log "✅ GitLab now at $version"
+  sudo gitlab-rake gitlab:env:info >> "$LOGFILE"
+
+  if [[ "$NON_INTERACTIVE" == false ]]; then
+    read -p "🔎 Press Enter to continue..."
+  fi
+}
+
+main() {
+  local current next
+  current=$(get_current_version)
+  log "📌 Current GitLab version: $current"
+
+  next=$(find_next_version "$current")
+  if [[ -z "$next" ]]; then
+    log "✅ You are fully up to date."
+    exit 0
+  fi
+
+  log "🚀 Preparing upgrade from $current → $next"
+  attempt_upgrade "$next"
+
+  log "♻️ Restarting script to continue upgrade chain..."
+  exec "$0" "$@"
+}
+
+main
