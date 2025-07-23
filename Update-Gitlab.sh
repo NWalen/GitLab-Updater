@@ -38,10 +38,10 @@ progress_bar_run() {
   shift
   local cmd=("$@")
 
-  local total_blocks=20
-  local delay=0.2
-  local fill_char="█"
-  local empty_char="░"
+  local total_blocks=30
+  local delay=0.15
+  local fill_char="#"
+  local empty_char="-"
 
   printf "🔄 %-30s [" "$msg"
 
@@ -54,7 +54,8 @@ progress_bar_run() {
     local bar
     bar="$(printf "%${filled}s" | tr ' ' "$fill_char")"
     bar="${bar}$(printf "%$((total_blocks - filled))s" | tr ' ' "$empty_char")"
-    printf "\r🔄 %-30s [%s] %2d%%" "$msg" "$bar" $(( (filled * 100) / total_blocks ))
+    local percent=$(( (filled * 100) / total_blocks ))
+    printf "\r🔄 %-30s [%s] %3d%%" "$msg" "$bar" "$percent"
     sleep $delay
     i=$((i + 1))
   done
@@ -70,6 +71,7 @@ progress_bar_run() {
 
   return $status
 }
+
 
 get_current_version() {
   local version
