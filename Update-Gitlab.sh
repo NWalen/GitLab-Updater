@@ -68,11 +68,11 @@ real_download_progress() {
   local url="$2"
   local outfile="$3"
 
-  echo "\n🔄 Downloading $version..."
-  wget --progress=dot "$url" -O "$outfile" 2>&1 \
+  echo -e "\n🔄 Downloading $version..."
+  wget --progress=dot:giga "$url" -O "$outfile" 2>&1 \
     | grep --line-buffered "%" \
     | sed -u -e "s/\./#/g" \
-    | awk '{printf("\r   [%-70s] %s", $2, $2)} END { print "" }'
+    | awk '{gsub("%", "", $2); percent=$2; barLen=int(percent/2); printf("\r   [%-50s] %3s%%", substr("##################################################", 1, barLen), percent)} END { print "" }'
 }
 
 get_current_version() {
@@ -111,10 +111,10 @@ attempt_upgrade() {
     log "❌ dpkg failed for $version — checking for required intermediate version..."
 
     local required_version=""
-    required_version=$(grep -oP "upgrade to the latest \\K[0-9]+\\.[0-9]+(?=\\.x)" dpkg_error.log || true)
+    required_version=$(grep -oP "upgrade to the latest \K[0-9]+\.[0-9]+(?=\.x)" dpkg_error.log || true)
 
     if [[ -z "$required_version" ]]; then
-      required_version=$(grep -oP "It is required to upgrade to \\K[0-9]+\\.[0-9]+" dpkg_error.log || true)
+      required_version=$(grep -oP "It is required to upgrade to \K[0-9]+\.[0-9]+" dpkg_error.log || true)
     fi
 
     if [[ -n "$required_version" ]]; then
