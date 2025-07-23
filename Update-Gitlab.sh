@@ -15,9 +15,11 @@ BASELINE_VERSIONS=(
   "17.1.4"
   "17.3.4"
   "17.4.2"
+  "17.8.4"
   "18.0.1"
   "18.2.0"
 )
+
 
 OS_CODENAME="jammy"
 ARCH="amd64"
