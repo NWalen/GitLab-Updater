@@ -80,8 +80,13 @@ attempt_upgrade() {
     done_bar
     log "❌ dpkg failed for $version — checking for required intermediate version..."
 
-    local required_version
+    local required_version=""
     required_version=$(grep -oP "upgrade to the latest \K[0-9]+\.[0-9]+(?=\.x)" dpkg_error.log || true)
+
+    # Fallback parsing
+    if [[ -z "$required_version" ]]; then
+      required_version=$(grep -oP "It is required to upgrade to \K[0-9]+\.[0-9]+" dpkg_error.log || true)
+    fi
 
     if [[ -n "$required_version" ]]; then
       case "$required_version" in
@@ -93,15 +98,21 @@ attempt_upgrade() {
         "17.1")  required_version="17.1.4" ;;
         "17.3")  required_version="17.3.4" ;;
         "17.4")  required_version="17.4.2" ;;
+        "17.5")  required_version="17.5.2" ;;  # Add if needed
         "18.0")  required_version="18.0.1" ;;
+        "18.1")  required_version="18.1.2" ;;
         "18.2")  required_version="18.2.0" ;;
-        *) log "⚠️ Unknown version requirement: $required_version"; exit 1 ;;
+        *) log "⚠️ Unknown intermediate version string: $required_version"; exit 1 ;;
       esac
 
       log "➕ Inserting required version: $required_version before $version"
       UPGRADE_PATH=("$required_version" "$version" "${UPGRADE_PATH[@]:1}")
     else
-      log "❌ Could not determine missing version. Check dpkg_error.log."
+      log "❌ Could not determine required intermediate version. Dumping dpkg_error.log:"
+      echo "------------ dpkg_error.log -------------"
+      cat dpkg_error.log
+      echo "-----------------------------------------"
+      log "💡 Suggest manually checking upgrade path: https://docs.gitlab.com/ee/update/#upgrade-paths"
       exit 1
     fi
     return 1
@@ -121,6 +132,7 @@ attempt_upgrade() {
 
   return 0
 }
+
 
 main() {
   local current
