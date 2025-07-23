@@ -89,11 +89,14 @@ real_download_progress() {
 get_current_version() {
   local version
   version=$(sudo gitlab-rake gitlab:env:info 2>/dev/null \
-    | grep -m1 '^  Version:' \
-    | awk '{print $2}' \
+    | awk '/^GitLab information/,/^GitLab Shell/' \
+    | grep "^Version:" \
+    | head -1 \
+    | awk -F ':' '{gsub(/ /, "", $2); print $2}' \
     | cut -d '-' -f1)
   echo "$version"
 }
+
 
 find_upgrade_path() {
   local current="$1"
