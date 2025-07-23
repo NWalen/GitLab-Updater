@@ -12,7 +12,7 @@ BASELINE_VERSIONS=(
   "15.1.6"
   "15.4.6"
   "15.11.13"
-  
+
   # GitLab 16
   "16.0.10"
   "16.1.8"
@@ -106,6 +106,7 @@ find_upgrade_path() {
     if [[ "$started" -eq 1 ]]; then
       UPGRADE_PATH+=("$v")
     elif [[ "$v" == "$current" ]]; then
+      UPGRADE_PATH+=("$v")
       started=1
     fi
   done
@@ -190,7 +191,7 @@ main() {
 
   log "🚀 Starting upgrade path from $current → ${UPGRADE_PATH[-1]}"
 
-  local i=0
+  local i=1
   while [[ $i -lt ${#UPGRADE_PATH[@]} ]]; do
     if attempt_upgrade "${UPGRADE_PATH[$i]}"; then
       ((i++))
