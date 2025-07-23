@@ -87,16 +87,14 @@ real_download_progress() {
 }
 
 get_current_version() {
-  local version
-  version=$(sudo gitlab-rake gitlab:env:info 2>/dev/null \
-    | awk '/^GitLab information/,/^GitLab Shell/' \
-    | grep "^Version:" \
-    | head -1 \
-    | awk -F ':' '{gsub(/ /, "", $2); print $2}' \
-    | cut -d '-' -f1)
-  echo "$version"
+  local version_file="/opt/gitlab/version-manifest.json"
+  if [[ -f "$version_file" ]]; then
+    version=$(jq -r '.version' "$version_file")
+    echo "$version"
+  else
+    echo "UNKNOWN"
+  fi
 }
-
 
 find_upgrade_path() {
   local current="$1"
