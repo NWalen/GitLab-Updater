@@ -40,7 +40,6 @@ progress_bar_run() {
 
   local total_blocks=20
   local delay=0.2
-  local bar=""
   local fill_char="█"
   local empty_char="░"
 
@@ -52,8 +51,9 @@ progress_bar_run() {
   local i=0
   while kill -0 "$pid" 2>/dev/null; do
     local filled=$(( (i * total_blocks / 10) % (total_blocks + 1) ))
-    bar=$(printf "%-${total_blocks}s" | tr ' ' "$empty_char")
-    bar="${bar:0:$filled//${empty_char}/${fill_char}}${bar:$filled}"
+    local bar
+    bar="$(printf "%${filled}s" | tr ' ' "$fill_char")"
+    bar="${bar}$(printf "%$((total_blocks - filled))s" | tr ' ' "$empty_char")"
     printf "\r🔄 %-30s [%s] %2d%%" "$msg" "$bar" $(( (filled * 100) / total_blocks ))
     sleep $delay
     i=$((i + 1))
